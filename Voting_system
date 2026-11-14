@@ -1,0 +1,476 @@
+import javax.swing.*;
+import java.awt.*;
+import java.util.*;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+public class Main1 {
+ static HashMap<String, String> voters = new HashMap<>();
+ static HashSet<String> votedUsers = new HashSet<>();
+ static LinkedHashMap<String, Integer> results =
+ new LinkedHashMap<>();
+ static ArrayList<String> activity = new ArrayList<>();
+ // New voter details
+ static class VoterDetails {
+ String name;
+ LocalDate dob;
+ boolean citizen;
+ VoterDetails(String name, LocalDate dob, boolean citizen) {
+ this.name = name;
+ this.dob = dob;
+ this.citizen = citizen;
+ }
+ int getAge() {
+ return Period.between(dob, LocalDate.now()).getYears();
+ }
+ }
+ static HashMap<String, VoterDetails> voterDetails =
+ new HashMap<>();
+ // Store each voter's selected party
+ static HashMap<String, String> userVotes = new HashMap<>();
+ static String[] parties = {
+ "Party A", "Party B", "Party C", "NOTA"
+ }; 12
+ static String adminPassword = "admin123";
+ // Indian flag background
+ static JPanel createIndianFlagBackground() {
+ JPanel panel = new JPanel() {
+ protected void paintComponent(Graphics g) {
+ super.paintComponent(g);
+ Graphics2D g2 = (Graphics2D) g.create();
+ int w = getWidth();
+ int h = getHeight();
+ if (w <= 0 || h <= 0) {
+ g2.dispose();
+ return;
+ }
+ g2.setRenderingHint(
+ RenderingHints.KEY_RENDERING,
+ RenderingHints.VALUE_RENDER_QUALITY
+ );
+ float[] stops = {
+ 0.0f, 0.22f, 0.34f, 0.43f,
+ 0.55f, 0.66f, 0.78f, 1.0f
+ };
+ Color[] colors = {
+ new Color(255, 153, 51),
+ new Color(255, 177, 91),
+ new Color(255, 215, 177),
+ new Color(255, 250, 241),
+ Color.WHITE,
+ new Color(220, 238, 211),
+ new Color(83, 172, 70),
+ new Color(19, 136, 8)
+ };
+ g2.setPaint(new LinearGradientPaint(
+ 0, 0, 0, h, stops, colors
+ )); 13
+ g2.fillRect(0, 0, w, h);
+ g2.setComposite(
+ AlphaComposite.getInstance(
+ AlphaComposite.SRC_OVER, 0.12f
+ )
+ );
+ g2.setColor(Color.WHITE);
+ g2.fillOval(w / 5, h / 5, w / 2, h / 3);
+ g2.setColor(new Color(255, 190, 120));
+ g2.fillOval(-w / 4, h / 4, w, h / 3);
+ g2.setColor(new Color(120, 190, 100));
+ g2.fillOval(w / 3, h / 2, w, h / 2);
+ g2.dispose();
+ }
+ };
+ panel.setLayout(new GridLayout(0, 1, 8, 8));
+ return panel;
+ }
+ public static void main(String[] args) {
+ voters.put("madhubala", "madhu123");
+ voters.put("meenakshi", "meena123");
+ voters.put("michelle", "michelle123");
+ voters.put("mohanasundari", "mohana123");
+ // Existing voters details
+ voterDetails.put("madhubala",
+ new VoterDetails("MADHUBALA B",
+ LocalDate.of(2000, 5, 15), true));
+ voterDetails.put("meenakshi",
+ new VoterDetails("MEENAKSHI I",
+ LocalDate.of(2001, 8, 20), true));
+ voterDetails.put("michelle",
+ new VoterDetails("MICHELLE M",
+ LocalDate.of(1999, 3, 10), true)); 14
+ voterDetails.put("mohanasundari",
+ new VoterDetails("MOHANASUNDARI M",
+ LocalDate.of(2002, 1, 25), true));
+ for (String party : parties) {
+ results.put(party, 0);
+ }
+ SwingUtilities.invokeLater(() -> showLogin());
+ }
+ static void showLogin() {
+ JFrame frame = new JFrame("Online Voting System");
+ frame.setSize(420, 350);
+ frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+ frame.setLocationRelativeTo(null);
+ JPanel panel = createIndianFlagBackground();
+ panel.setBorder(BorderFactory.createEmptyBorder(
+ 20, 35, 20, 35));
+ JLabel title = new JLabel("ONLINE VOTING SYSTEM",
+ SwingConstants.CENTER);
+ title.setFont(new Font("Arial", Font.BOLD, 20));
+ JTextField username = new JTextField();
+ JPasswordField password = new JPasswordField();
+ JButton login = new JButton("Voter Login");
+ JButton officer = new JButton("Officer Login");
+ panel.add(title);
+ panel.add(new JLabel("Username:"));
+ panel.add(username);
+ panel.add(new JLabel("Password:"));
+ panel.add(password);
+ panel.add(login);
+ panel.add(officer);
+ login.addActionListener(e -> {
+ String user = username.getText().trim().toLowerCase();
+ String pass = new String(password.getPassword());
+ if (voters.containsKey(user)
+ && voters.get(user).equals(pass)) { 15
+ activity.add(user + " logged in");
+ // Check age and citizenship for new voters
+ if (voterDetails.containsKey(user)) {
+ VoterDetails details = voterDetails.get(user);
+ if (!details.citizen) {
+ JOptionPane.showMessageDialog(frame,
+ "You are not an Indian citizen. "
+ + "You cannot vote!");
+ return;
+ }
+ if (details.getAge() < 18) {
+ JOptionPane.showMessageDialog(frame,
+ "You must be 18 years old to vote!");
+ return;
+ }
+ }
+ if (votedUsers.contains(user)) {
+ JOptionPane.showMessageDialog(frame,
+ "You have already voted!");
+ } else {
+ frame.dispose();
+ showVotingPage(user);
+ }
+ } else {
+ JOptionPane.showMessageDialog(frame,
+ "Invalid username or password!");
+ }
+ });
+ officer.addActionListener(e -> {
+ String pass = JOptionPane.showInputDialog(
+ frame, "Enter Officer Password:");
+ if (pass == null) {
+ return;
+ }
+ if (adminPassword.equals(pass)) {
+ activity.add("Officer logged in"); 16
+ frame.dispose();
+ showOfficerDashboard();
+ } else {
+ JOptionPane.showMessageDialog(frame,
+ "Invalid officer password!");
+ }
+ });
+ frame.add(panel);
+ frame.setVisible(true);
+ }
+ // ADD NEW VOTER
+ static void addVoter(JFrame frame) {
+ JTextField nameField = new JTextField();
+ JTextField idField = new JTextField();
+ JPasswordField passwordField = new JPasswordField();
+ JTextField dobField = new JTextField();
+ JComboBox<String> citizenBox =
+ new JComboBox<>(new String[]{"Yes", "No"});
+ JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
+ panel.add(new JLabel("Voter Name:"));
+ panel.add(nameField);
+ panel.add(new JLabel("Voter ID:"));
+ panel.add(idField);
+ panel.add(new JLabel("Password:"));
+ panel.add(passwordField);
+ panel.add(new JLabel("Date of Birth (yyyy-MM-dd):"));
+ panel.add(dobField);
+ panel.add(new JLabel("Indian Citizen:"));
+ panel.add(citizenBox);
+ int option = JOptionPane.showConfirmDialog(
+ frame,
+ panel,
+ "Add New Voter",
+ JOptionPane.OK_CANCEL_OPTION 17
+ );
+ if (option != JOptionPane.OK_OPTION) {
+ return;
+ }
+ String name = nameField.getText().trim();
+ String id = idField.getText().trim().toLowerCase();
+ String password =
+ new String(passwordField.getPassword());
+ String dobText = dobField.getText().trim();
+ boolean citizen =
+ citizenBox.getSelectedItem().equals("Yes");
+ if (name.isEmpty() || id.isEmpty()
+ || password.isEmpty() || dobText.isEmpty()) {
+ JOptionPane.showMessageDialog(frame,
+ "Please fill all details!");
+ return;
+ }
+ if (voters.containsKey(id)) {
+ JOptionPane.showMessageDialog(frame,
+ "Voter ID already exists!");
+ return;
+ }
+ try {
+ LocalDate dob = LocalDate.parse(
+ dobText,
+ DateTimeFormatter.ISO_LOCAL_DATE
+ );
+ if (dob.isAfter(LocalDate.now())) {
+ JOptionPane.showMessageDialog(frame,
+ "Invalid Date of Birth!");
+ return;
+ }
+ int age = Period.between(
+ dob, LocalDate.now()).getYears();
+ voters.put(id, password); 18
+ voterDetails.put(
+ id,
+ new VoterDetails(name, dob, citizen)
+ );
+ activity.add(name + " (" + id + ") added");
+ JOptionPane.showMessageDialog(frame,
+ "Voter Added Successfully!\n"
+ + "Name: " + name
+ + "\nID: " + id
+ + "\nAge: " + age
+ + "\nIndian Citizen: "
+ + (citizen ? "Yes" : "No"));
+ } catch (Exception ex) {
+ JOptionPane.showMessageDialog(frame,
+ "Invalid DOB! Use yyyy-MM-dd format.");
+ }
+ }
+ // REMOVE VOTER
+ static void removeVoter(JFrame frame) {
+ String id = JOptionPane.showInputDialog(
+ frame, "Enter Voter ID to Remove:");
+ if (id == null) {
+ return;
+ }
+ id = id.trim().toLowerCase();
+ if (!voters.containsKey(id)) {
+ JOptionPane.showMessageDialog(frame,
+ "Voter ID not found!");
+ return;
+ }
+ int confirm = JOptionPane.showConfirmDialog(
+ frame,
+ "Are you sure you want to remove this voter?",
+ "Remove Voter",
+ JOptionPane.YES_NO_OPTION
+ ); 19
+ if (confirm == JOptionPane.YES_OPTION) {
+ // Remove previous vote count if voter has voted
+ if (userVotes.containsKey(id)) {
+ String party = userVotes.get(id);
+ results.put(party, results.get(party) - 1);
+ userVotes.remove(id);
+ }
+ voters.remove(id);
+ voterDetails.remove(id);
+ votedUsers.remove(id);
+ activity.add(id + " removed from voter list");
+ JOptionPane.showMessageDialog(frame,
+ "Voter Removed Successfully!");
+ }
+ }
+ // VIEW VOTER LIST
+ static void viewVoterList(JFrame frame) {
+ StringBuilder text = new StringBuilder();
+ text.append("REGISTERED VOTER LIST\n\n");
+ for (String id : voters.keySet()) {
+ text.append("ID: ").append(id).append("\n");
+ if (voterDetails.containsKey(id)) {
+ VoterDetails details = voterDetails.get(id);
+ text.append("Name: ")
+ .append(details.name).append("\n");
+ text.append("DOB: ")
+ .append(details.dob).append("\n");
+ text.append("Age: ")
+ .append(details.getAge()).append("\n"); 20
+ text.append("Indian Citizen: ")
+ .append(details.citizen ? "Yes" : "No")
+ .append("\n");
+ }
+ text.append("Voting Status: ")
+ .append(votedUsers.contains(id)
+ ? "Voted" : "Not Voted")
+ .append("\n\n");
+ }
+ JTextArea area = new JTextArea(text.toString());
+ area.setEditable(false);
+ JOptionPane.showMessageDialog(
+ frame,
+ new JScrollPane(area),
+ "Voter List",
+ JOptionPane.INFORMATION_MESSAGE
+ );
+ }
+ static void showVotingPage(String user) {
+ JFrame frame = new JFrame("Cast Your Vote");
+ frame.setSize(400, 390);
+ frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+ frame.setLocationRelativeTo(null);
+ JPanel panel = createIndianFlagBackground();
+ panel.setBorder(BorderFactory.createEmptyBorder(
+ 25, 30, 25, 30));
+ String displayName = "";
+ if (user.equals("madhubala"))
+ displayName = "MADHUBALA B";
+ else if (user.equals("meenakshi"))
+ displayName = "MEENAKSHI I";
+ else if (user.equals("michelle"))
+ displayName = "MICHELLE M";
+ else if (user.equals("mohanasundari"))
+ displayName = "MOHANASUNDARI M";
+ else if (voterDetails.containsKey(user))
+ displayName = voterDetails.get(user).name; 21
+ JLabel welcome = new JLabel("Welcome, " + displayName + "!");
+ JLabel label = new JLabel("Select your party:");
+ // Radio buttons
+ JRadioButton r1 = new JRadioButton("Party A");
+ JRadioButton r2 = new JRadioButton("Party B");
+ JRadioButton r3 = new JRadioButton("Party C");
+ JRadioButton r4 = new JRadioButton("NOTA");
+ r1.setOpaque(false);
+ r2.setOpaque(false);
+ r3.setOpaque(false);
+ r4.setOpaque(false);
+ ButtonGroup group = new ButtonGroup();
+ group.add(r1);
+ group.add(r2);
+ group.add(r3);
+ group.add(r4);
+ JButton submit = new JButton("Submit Vote");
+ JButton logout = new JButton("Logout");
+ panel.add(welcome);
+ panel.add(label);
+ panel.add(r1);
+ panel.add(r2);
+ panel.add(r3);
+ panel.add(r4);
+ panel.add(submit);
+ panel.add(logout);
+ submit.addActionListener(e -> {
+ if (votedUsers.contains(user)) {
+ JOptionPane.showMessageDialog(frame,
+ "You have already voted!");
+ return;
+ }
+ String selected = null;
+ if (r1.isSelected())
+ selected = "Party A";
+ else if (r2.isSelected()) 22
+ selected = "Party B";
+ else if (r3.isSelected())
+ selected = "Party C";
+ else if (r4.isSelected())
+ selected = "NOTA";
+ if (selected == null) {
+ JOptionPane.showMessageDialog(frame,
+ "Please select a party.");
+ return;
+ }
+ int confirm = JOptionPane.showConfirmDialog(
+ frame,
+ "Are you sure you want to submit your vote?",
+ "Confirm Vote",
+ JOptionPane.YES_NO_OPTION);
+ if (confirm == JOptionPane.YES_OPTION) {
+ results.put(selected, results.get(selected) + 1);
+ votedUsers.add(user);
+ // Save voter's selected party
+ userVotes.put(user, selected);
+ activity.add(user + " submitted a vote");
+ JOptionPane.showMessageDialog(frame,
+ "Vote submitted successfully!");
+ frame.dispose();
+ showLogin();
+ }
+ });
+ logout.addActionListener(e -> {
+ activity.add(user + " logged out");
+ frame.dispose();
+ showLogin();
+ });
+ frame.add(panel);
+ frame.setVisible(true);
+ } 23
+ static void showOfficerDashboard() {
+ JFrame frame = new JFrame("Officer Dashboard");
+ frame.setSize(600, 550);
+ frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+ frame.setLocationRelativeTo(null);
+ JPanel panel = createIndianFlagBackground();
+ panel.setLayout(new BorderLayout(10, 10));
+ panel.setBorder(BorderFactory.createEmptyBorder(
+ 15, 20, 15, 20));
+ JTextArea output = new JTextArea();
+ output.setEditable(false);
+ output.setBackground(Color.WHITE);
+ JButton refresh = new JButton("View Latest Results");
+ JButton logs = new JButton("View Activity Log");
+ JButton logout = new JButton("Logout");
+ // New admin buttons
+ JButton add = new JButton("Add Voter");
+ JButton remove = new JButton("Remove Voter");
+ JButton list = new JButton("View Voter List");
+ refresh.addActionListener(e -> {
+ StringBuilder text = new StringBuilder();
+ text.append("ELECTION RESULTS\n\n");
+ for (String party : parties) {
+ text.append(party)
+ .append(": ")
+ .append(results.get(party))
+ .append(" votes\n");
+ }
+ text.append("\nRegistered voters: ")
+ .append(voters.size());
+ text.append("\nVoters who voted: ")
+ .append(votedUsers.size());
+ text.append("\nNot yet voted: ")
+ .append(voters.size() - votedUsers.size()); 24
+ output.setText(text.toString());
+ });
+ logs.addActionListener(e -> {
+ StringBuilder text = new StringBuilder("ACTIVITY LOG\n\n");
+ for (String item : activity) {
+ text.append(item).append("\n");
+ }
+ output.setText(text.toString());
+ });
+ add.addActionListener(e -> addVoter(frame));
+ remove.addActionListener(e -> removeVoter(frame));
+ list.addActionListener(e -> viewVoterList(frame));
+ logout.addActionListener(e -> {
+ frame.dispose();
+ showLogin();
+ });
+ JPanel buttons = new JPanel(new GridLayout(2, 3, 5, 5));
+ buttons.setOpaque(false);
+ buttons.add(refresh);
+ buttons.add(logs);
+ buttons.add(add);
+ buttons.add(remove);
+ buttons.add(list);
+ buttons.add(logout);
+ panel.add(new JScrollPane(output), BorderLayout.CENTER);
+ panel.add(buttons, BorderLayout.SOUTH);
+ frame.add(panel);
+ frame.setVisible(true);
+ }
+}
